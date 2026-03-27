@@ -1,0 +1,50 @@
+import { readFileSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
+import { parse as parseYaml } from 'yaml';
+import { configSchema, ReSpecConfig } from './schema.js';
+
+export async function loadConfig(dir: string): Promise<ReSpecConfig> {
+  const configPath = join(dir, 'respec.config.yaml');
+
+  if (!existsSync(configPath)) {
+    throw new Error(`respec.config.yaml not found in ${dir}`);
+  }
+
+  const raw = readFileSync(configPath, 'utf-8');
+
+  let parsed: unknown;
+  try {
+    parsed = parseYaml(raw);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(`Failed to parse respec.config.yaml: ${message}`);
+  }
+
+  const result = configSchema.safeParse(parsed);
+
+  if (!result.success) {
+    const formatted = result.error.issues
+      .map((issue) => `  - ${issue.path.join('.')}: ${issue.message}`)
+      .join('\n');
+    throw new Error(`Invalid respec.config.yaml:\n${formatted}`);
+  }
+
+  return result.data;
+}
+
+export function resolveEnvAuth(value: string): string {
+  if (!value.startsWith('env:')) {
+    return value;
+  }
+
+  const varName = value.slice(4);
+  const resolved = process.env[varName];
+
+  if (resolved === undefined) {
+    throw new Error(
+      `Environment variable ${varName} is not set (referenced as "env:${varName}" in config)`
+    );
+  }
+
+  return resolved;
+}
