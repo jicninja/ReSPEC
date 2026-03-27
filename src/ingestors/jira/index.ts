@@ -32,7 +32,9 @@ export class JiraIngestor implements Ingestor {
     const client = new Version2Client({
       host: this.config.host,
       authentication: {
-        personalAccessToken: token,
+        oauth2: {
+          accessToken: token,
+        },
       },
     });
 
