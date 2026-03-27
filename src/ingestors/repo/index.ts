@@ -1,3 +1,4 @@
+import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { writeMarkdown, ensureDir } from '../../utils/fs.js';
 import { cloneIfRemote } from '../../utils/git.js';
@@ -34,6 +35,10 @@ export class RepoIngestor implements Ingestor {
     // Clone if remote, otherwise use the local path
     const tmpCloneDir = path.join(this.outputDir, '_clone_tmp');
     const repoDir = await cloneIfRemote(this.config.path, tmpCloneDir);
+
+    if (!fs.existsSync(repoDir)) {
+      throw new Error(`Repository path does not exist: ${repoDir}`);
+    }
 
     const repoOutputDir = path.join(this.outputDir, 'repo');
     ensureDir(repoOutputDir);

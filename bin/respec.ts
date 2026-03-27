@@ -8,6 +8,18 @@ import { runExport } from '../src/commands/export.js';
 import { runStatus } from '../src/commands/status.js';
 import { runValidate } from '../src/commands/validate.js';
 
+function wrapAction(fn: (...args: any[]) => Promise<void>) {
+  return async (...args: any[]) => {
+    try {
+      await fn(...args);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(`Error: ${message}`);
+      process.exit(1);
+    }
+  };
+}
+
 const program = new Command();
 
 program
@@ -18,60 +30,60 @@ program
 program
   .command('init')
   .description('Create respec.config.yaml with sensible defaults')
-  .action(async () => {
+  .action(wrapAction(async () => {
     await runInit(process.cwd());
-  });
+  }));
 
 program
   .command('ingest')
   .description('Read all sources and write raw data to .respec/raw/')
   .option('--source <source>', 'Only run a specific ingestor (repo, jira, docs)')
   .option('--force', 'Bypass phase prerequisite checks')
-  .action(async (options: { source?: string; force?: boolean }) => {
+  .action(wrapAction(async (options: { source?: string; force?: boolean }) => {
     await runIngest(process.cwd(), options);
-  });
+  }));
 
 program
   .command('analyze')
   .description('AI analysis of raw data, writes to .respec/analyzed/')
   .option('--only <analyzer>', 'Only run a specific analyzer by id')
   .option('--force', 'Bypass phase prerequisite checks')
-  .action(async (options: { only?: string; force?: boolean }) => {
+  .action(wrapAction(async (options: { only?: string; force?: boolean }) => {
     await runAnalyze(process.cwd(), options);
-  });
+  }));
 
 program
   .command('generate')
   .description('Generate final specs from analyzed data into /specs/')
   .option('--only <generator>', 'Only run a specific generator by id')
   .option('--force', 'Bypass phase prerequisite checks')
-  .action(async (options: { only?: string; force?: boolean }) => {
+  .action(wrapAction(async (options: { only?: string; force?: boolean }) => {
     await runGenerate(process.cwd(), options);
-  });
+  }));
 
 program
   .command('export')
   .description('Package /specs/ into a Claude Code skill set or other format')
   .option('--format <format>', 'Output format (kiro, openspec, antigravity, superpowers)')
   .option('--output <dir>', 'Output directory (defaults to specs dir from config)')
-  .action(async (options: { format?: string; output?: string }) => {
+  .action(wrapAction(async (options: { format?: string; output?: string }) => {
     await runExport(process.cwd(), options);
-  });
+  }));
 
 program
   .command('status')
   .description('Show current pipeline state and phase coverage')
   .option('--verbose', 'Show detailed stats for each phase')
-  .action(async (options: { verbose?: boolean }) => {
+  .action(wrapAction(async (options: { verbose?: boolean }) => {
     await runStatus(process.cwd(), options);
-  });
+  }));
 
 program
   .command('validate')
   .description('Validate integrity of current phase outputs')
   .option('--phase <phase>', 'Validate a specific phase (raw, analyzed, specs)')
-  .action(async (options: { phase?: string }) => {
+  .action(wrapAction(async (options: { phase?: string }) => {
     await runValidate(process.cwd(), options);
-  });
+  }));
 
 program.parse();
