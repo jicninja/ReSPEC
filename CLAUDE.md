@@ -129,7 +129,8 @@ raw/
 │   └── bugs.md
 ├── docs/
 │   ├── readme.md
-│   └── local/{file}.md
+│   ├── local/{file}.md
+│   └── confluence/{slug}.md     # Confluence pages (if configured)
 └── _manifest.md
 ```
 
@@ -168,7 +169,7 @@ Output varies by `output.format`. See SDD section 8.3 for full directory layouts
 **Tier 1** (parallel): domain-mapper, infra-detector, api-mapper
 **Tier 2** (parallel, uses Tier 1 output): flow-extractor, rule-miner, permission-scanner
 
-Each self-reports confidence (HIGH/MEDIUM/LOW) in `_analysis-report.md`.
+Each self-reports confidence (HIGH/MEDIUM/LOW) in `_analysis-report.md`. Confidence is parsed from AI output by `src/analyzers/confidence-parser.ts` and stored as floats in `state.json` (HIGH=0.9, MEDIUM=0.6, LOW=0.3). Tier 2 analyzers receive Tier 1 output as additional context. All analyzers receive context source data when available.
 
 ## Generators
 
@@ -186,6 +187,22 @@ Each self-reports confidence (HIGH/MEDIUM/LOW) in `_analysis-report.md`.
 | `openspec` | Any agent | `openspec/specs/` + `openspec/changes/` |
 | `antigravity` | Google Antigravity | `GEMINI.md` + `.agent/rules/` |
 | `superpowers` | Claude Code | `CLAUDE.md` + `skills/` |
+
+## TUI (Terminal UI)
+
+All commands use an interactive TUI with 3 modes:
+
+| Mode | Flag | Behavior |
+|------|------|----------|
+| interactive | (default) | Styled output, pauses on breakpoints, waits for input |
+| auto | `--auto` | Styled output, auto-continues, logs decisions to `.respec/_decisions.md` |
+| ci | `--ci` | Plain text, no colors, no interaction |
+
+Hotkeys at runtime: `a` → switch to auto, `p` → pause to interactive.
+
+TUI code lives in `src/tui/`: renderer.ts (formatting), controller.ts (mode logic), keypress.ts (hotkeys), decision-log.ts (auto-decision audit trail), factory.ts (createTUI).
+
+Commands use `tui.progress()`, `tui.success()`, `tui.warn()`, `tui.ask()` — never `console.log` directly.
 
 ## Design Principles
 
