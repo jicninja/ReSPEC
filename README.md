@@ -1,6 +1,10 @@
-# ReSpec
+<p align="center">
+  <img src="logo.svg" alt="ReSpec — Legacy to SDD, Fast" width="420">
+</p>
 
-**Reverse-engineer legacy codebases into complete specifications.**
+<p align="center">
+  <strong>Reverse-engineer legacy codebases into complete specifications.</strong>
+</p>
 
 ReSpec is a CLI tool that reads your code, Jira tickets, and documentation, then produces a System Design Document (SDD) with everything needed to rebuild the system from scratch — without carrying over legacy code.
 
