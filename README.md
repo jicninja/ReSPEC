@@ -58,7 +58,7 @@ ReSpec works with any AI coding agent. Configure once in `respec.config.yaml`:
 ai:
   engine: claude    # "claude" | "codex" | "gemini" | "custom"
   max_parallel: 4   # concurrent subagents
-  timeout: 300       # seconds per subagent
+  timeout: 600       # seconds per subagent
 ```
 
 Analyzers and generators run as parallel subagents for speed. Tier 1 analyzers (domain, infra, API) run first, then Tier 2 (flows, rules, permissions) uses their output.
@@ -117,7 +117,7 @@ sources:
 ai:
   engine: claude
   max_parallel: 4
-  timeout: 300
+  timeout: 600
 
 output:
   dir: ./specs
