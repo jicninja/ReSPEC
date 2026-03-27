@@ -101,6 +101,15 @@ sources:
       - "**/node_modules/**"
       - "**/*.test.ts"
 
+  context:                     # optional — other repos for reference
+    - name: backend-api
+      path: ../backend
+      role: backend            # backend | frontend | mobile | api_provider
+                               # shared_types | design_system | infra | reference
+    - name: shared-lib
+      path: ../shared
+      role: shared_types
+
   jira:                        # optional
     host: https://company.atlassian.net
     auth: env:JIRA_API_TOKEN   # reads from environment variable
@@ -141,11 +150,31 @@ Credentials always use the `env:` prefix — never stored in the config file.
 | `respec validate` | Checks integrity of phase outputs |
 
 **Flags:**
-- `--source repo|jira|docs` — run a single ingestor
+- `--source repo|context|jira|docs` — run a single ingestor
 - `--only <analyzer|generator>` — run a single analyzer or generator
 - `--format kiro|openspec|antigravity|superpowers` — target format for export
 - `--force` — bypass prerequisite checks
 - `--verbose` — detailed output
+
+## Primary vs. context sources
+
+The **primary source** (`sources.repo`) is what gets reverse-engineered into the SDD. **Context sources** (`sources.context`) provide reference information — they inform the analysis but are not the target of the specification.
+
+Example: you're rebuilding a web frontend. The primary source is the frontend repo. You add the backend API as a context source so ReSpec understands the endpoints your frontend consumes, without trying to spec the backend itself.
+
+```yaml
+sources:
+  repo:
+    path: ../frontend          # this gets the SDD
+  context:
+    - name: backend-api
+      path: ../backend
+      role: backend            # informs API contract analysis
+```
+
+Available roles: `backend`, `frontend`, `mobile`, `api_provider`, `shared_types`, `design_system`, `infra`, `reference`.
+
+Context sources are ingested into `.respec/raw/context/{name}/` with a `_context-role.md` marker that tells analyzers how to use them.
 
 ## What gets ingested
 

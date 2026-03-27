@@ -35,6 +35,18 @@ export const PHASE_ANALYZED = 'analyzed' as const;
 export const PHASE_GENERATED = 'generated' as const;
 export const PHASE_ORDER = [PHASE_EMPTY, PHASE_INGESTED, PHASE_ANALYZED, PHASE_GENERATED] as const;
 
+// ── Context Source Roles ─────────────────────────────────────────────
+export const CONTEXT_ROLES = [
+  'backend',
+  'frontend',
+  'mobile',
+  'api_provider',
+  'shared_types',
+  'design_system',
+  'infra',
+  'reference',
+] as const;
+
 // ── Ingestor Limits ─────────────────────────────────────────────────
 export const MAX_SCAN_DEPTH = 6;
 export const MAX_FILE_CONTENT_CHARS = 3000;

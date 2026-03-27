@@ -9,6 +9,7 @@ import {
   DEFAULT_REPO_BRANCH,
   OUTPUT_FORMATS,
   AI_ENGINES,
+  CONTEXT_ROLES,
 } from '../constants.js';
 
 const projectSchema = z.object({
@@ -26,8 +27,10 @@ const repoSourceSchema = z.object({
 });
 
 const contextSourceSchema = z.object({
+  name: z.string().optional(),
   path: z.string(),
-  role: z.enum(['api_provider', 'shared_types', 'design_system']),
+  role: z.enum(CONTEXT_ROLES),
+  branch: z.string().default(DEFAULT_REPO_BRANCH),
   include: z.array(z.string()).optional(),
   exclude: z.array(z.string()).optional(),
 });
