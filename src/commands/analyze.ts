@@ -10,17 +10,21 @@ import { rawDir, analyzedDir, writeMarkdown } from '../utils/fs.js';
 import type { AnalyzerReport } from '../analyzers/types.js';
 import type { SubagentTask } from '../ai/types.js';
 import { PHASE_INGESTED } from '../constants.js';
+import { createTUI } from '../tui/factory.js';
 
 export async function runAnalyze(
   dir: string,
-  options: { only?: string; force?: boolean }
+  options: { only?: string; force?: boolean; auto?: boolean; ci?: boolean }
 ): Promise<void> {
+  const tui = createTUI(options);
   const config = await loadConfig(dir);
   const state = new StateManager(dir);
 
   if (!options.force) {
     state.requirePhase(PHASE_INGESTED);
   }
+
+  tui.phaseHeader('ANALYZE', `Engine: ${config.ai.engine}`);
 
   const engine = createAIEngine(config.ai);
   const orchestrator = new Orchestrator(engine, {
@@ -55,7 +59,7 @@ export async function runAnalyze(
 
     if (tierAnalyzers.length === 0) continue;
 
-    console.log(`Running tier ${tier} analyzers: ${tierAnalyzers.map((a) => a.id).join(', ')}`);
+    tui.progress(`Tier ${tier}: ${tierAnalyzers.map((a) => a.id).join(', ')}`);
 
     const tasks: SubagentTask[] = tierAnalyzers.map((analyzer) => {
       // Build context from raw MDs
@@ -125,7 +129,9 @@ export async function runAnalyze(
         status: result.status,
         durationMs: result.durationMs,
         outputFiles: analyzer.produces,
-        confidence: result.status === 'success' ? 'MEDIUM' : undefined,
+        confidence: result.status === 'success'
+          ? { overall: 'MEDIUM', items: [] }
+          : undefined,
       };
 
       allReports.push(report);
@@ -134,9 +140,9 @@ export async function runAnalyze(
         // Write output to first produce file
         const outputFile = path.join(analyzedPath, analyzer.produces[0] ?? `${analyzer.id}.md`);
         writeMarkdown(outputFile, result.output);
-        console.log(`  ${result.id}: success (${result.durationMs}ms)`);
+        tui.success(`${result.id} — done (${result.durationMs}ms)`);
       } else {
-        console.warn(`  ${result.id}: ${result.status} — ${result.error ?? 'unknown error'}`);
+        tui.warn(`${result.id}: ${result.status}`, result.error ?? 'unknown error');
       }
     }
   }
@@ -155,5 +161,16 @@ export async function runAnalyze(
     confidence: { overall },
   });
 
-  console.log(`Analyze complete. ${analyzersRun.length} analyzers run. Overall confidence: ${(overall * 100).toFixed(0)}%`);
+  tui.phaseSummary('ANALYZE COMPLETE', [
+    ...allReports.map((r) => ({
+      label: r.id,
+      status: r.status === 'success' ? '✓' : '✗',
+      detail: r.status === 'success' ? `${r.durationMs}ms` : r.status,
+    })),
+    { label: 'confidence', status: '·', detail: `${(overall * 100).toFixed(0)}%` },
+  ]);
+
+  tui.setPhase('analyze');
+  tui.writeDecisionLog(path.join(dir, '.respec'));
+  tui.destroy();
 }

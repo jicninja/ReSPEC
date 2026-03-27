@@ -5,11 +5,13 @@ import { StateManager } from '../state/manager.js';
 import { createFormatAdapter } from '../formats/factory.js';
 import { analyzedDir, specsDir } from '../utils/fs.js';
 import { PHASE_ANALYZED } from '../constants.js';
+import { createTUI } from '../tui/factory.js';
 
 export async function runGenerate(
   dir: string,
-  options: { only?: string; force?: boolean }
+  options: { only?: string; force?: boolean; auto?: boolean; ci?: boolean }
 ): Promise<void> {
+  const tui = createTUI(options);
   const config = await loadConfig(dir);
   const state = new StateManager(dir);
 
@@ -36,13 +38,21 @@ export async function runGenerate(
     analyzedDir: analyzedPath,
   };
 
-  console.log(`Generating specs using format: ${format}`);
+  tui.phaseHeader('GENERATE', `Format: ${format}`);
+  tui.progress(`Generating specs using format: ${format}...`);
   await adapter.package(outputDir, outputDir, context);
+  tui.success(`Specs written to ${outputDir}`);
 
   state.completeGenerate({
     generators_run: [format],
     format,
   });
 
-  console.log(`Generate complete. Specs written to ${outputDir}`);
+  tui.phaseSummary('GENERATE COMPLETE', [
+    { label: format, status: '✓', detail: outputDir },
+  ]);
+
+  tui.setPhase('generate');
+  tui.writeDecisionLog(path.join(dir, '.respec'));
+  tui.destroy();
 }
