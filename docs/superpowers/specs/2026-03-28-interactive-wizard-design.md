@@ -62,11 +62,50 @@ Uses `@clack/prompts` select. Menu shows only valid actions for current pipeline
 
 | State | Options | Default |
 |-------|---------|---------|
-| no config | Init, Exit | Init |
-| empty (config exists) | Ingest, Status, Exit | Ingest |
-| ingested | Analyze, Re-ingest, Status, Exit | Analyze |
-| analyzed | Generate, Re-analyze, Status, Exit | Generate |
+| no config | Init, Autopilot, Exit | Init |
+| empty (config exists) | Ingest, Autopilot, Status, Exit | Ingest |
+| ingested | Analyze, Autopilot, Re-ingest, Status, Exit | Analyze |
+| analyzed | Generate, Autopilot, Re-analyze, Status, Exit | Generate |
 | generated | Export, Re-generate, Validate, Status, Exit | Export |
+
+## Autopilot Mode
+
+Runs the entire remaining pipeline automatically from the current state to completion. Available from any state except `generated`.
+
+```
+◇  What's next?
+│  ○ Ingest sources
+│  ● Autopilot — run full pipeline (recommended for new projects)
+│  ○ View status
+│  ○ Exit
+└
+
+◐  Autopilot: running full pipeline...
+
+◐  [1/4] Ingesting sources...
+✔  Ingest complete — 26 artifacts, 51 context files
+
+◐  [2/4] Analyzing (Tier 1)...
+✔  domain-mapper — done (45s)
+✔  infra-detector — done (43s)
+✔  api-mapper — done (44s)
+◐  [2/4] Analyzing (Tier 2)...
+✔  Analysis complete — 60% confidence
+
+◐  [3/4] Generating specs...
+✔  Generate complete — 6/6 generators
+
+◐  [4/4] Packaging as superpowers...
+✔  Autopilot complete! Specs at ./specs/
+```
+
+### Autopilot Behavior
+
+- Determines remaining phases from current state (e.g., if `ingested`, runs analyze → generate → export)
+- Runs each phase sequentially, showing progress with clack spinners
+- On phase failure: stops, shows error, returns to menu (user can retry or fix)
+- No confirmations between phases — that's the point of autopilot
+- Uses the same underlying command functions as manual mode
 
 ## Execution Feedback
 
