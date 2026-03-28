@@ -2,7 +2,7 @@ export type WizardState = 'no-config' | 'empty' | 'ingested' | 'analyzed' | 'gen
 
 export type WizardAction =
   | 'init' | 'ingest' | 'analyze' | 'generate' | 'export'
-  | 'autopilot' | 'status' | 'validate' | 'exit';
+  | 'autopilot' | 'reset' | 'status' | 'validate' | 'exit';
 
 export interface MenuOption {
   value: WizardAction;
@@ -33,6 +33,7 @@ const MENUS: Record<WizardState, { options: Omit<MenuOption, 'hint'>[]; recommen
       { value: 'analyze', label: 'Analyze with AI' },
       { value: 'autopilot', label: 'Autopilot — run remaining pipeline' },
       { value: 'ingest', label: 'Re-ingest sources' },
+      { value: 'reset', label: 'Start fresh — wipe all and re-run' },
       { value: 'status', label: 'View status' },
       { value: 'exit', label: 'Exit' },
     ],
@@ -43,6 +44,7 @@ const MENUS: Record<WizardState, { options: Omit<MenuOption, 'hint'>[]; recommen
       { value: 'generate', label: 'Generate specs' },
       { value: 'autopilot', label: 'Autopilot — run remaining pipeline' },
       { value: 'analyze', label: 'Re-analyze' },
+      { value: 'reset', label: 'Start fresh — wipe all and re-run' },
       { value: 'status', label: 'View status' },
       { value: 'exit', label: 'Exit' },
     ],
@@ -53,6 +55,7 @@ const MENUS: Record<WizardState, { options: Omit<MenuOption, 'hint'>[]; recommen
       { value: 'export', label: 'Export to format' },
       { value: 'generate', label: 'Re-generate specs' },
       { value: 'validate', label: 'Validate output' },
+      { value: 'reset', label: 'Start fresh — wipe all and re-run' },
       { value: 'status', label: 'View status' },
       { value: 'exit', label: 'Exit' },
     ],

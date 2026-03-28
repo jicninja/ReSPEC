@@ -1,5 +1,5 @@
 import * as clack from '@clack/prompts';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -7,7 +7,7 @@ import { showSplash } from './splash.js';
 import { buildMenuOptions, type WizardState, type WizardAction } from './menu.js';
 import { runAutopilot, runWithSpinner } from './runner.js';
 import { StateManager } from '../state/manager.js';
-import { CONFIG_FILENAME } from '../constants.js';
+import { CONFIG_FILENAME, RESPEC_DIR } from '../constants.js';
 import type { PipelinePhase } from '../state/types.js';
 
 async function executeCommand(command: string, dir: string): Promise<void> {
@@ -102,6 +102,22 @@ export async function runWizard(dir: string): Promise<void> {
     }
 
     const action = choice as WizardAction;
+
+    if (action === 'reset') {
+      const confirmed = await clack.confirm({
+        message: 'This will delete .respec/ and specs/. Are you sure?',
+      });
+      if (clack.isCancel(confirmed) || !confirmed) continue;
+
+      const respecPath = join(dir, RESPEC_DIR);
+      const specsPath = join(dir, 'specs');
+      if (existsSync(respecPath)) rmSync(respecPath, { recursive: true });
+      if (existsSync(specsPath)) rmSync(specsPath, { recursive: true });
+      clack.log.success('Wiped .respec/ and specs/');
+
+      await runAutopilot(dir, 'empty', executeCommand);
+      continue;
+    }
 
     if (action === 'autopilot') {
       await runAutopilot(dir, state, executeCommand);
