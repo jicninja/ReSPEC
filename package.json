@@ -24,6 +24,7 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "@clack/prompts": "^1.1.0",
     "chalk": "^5.6.2",
     "commander": "^14.0.3",
     "jira.js": "^5.3.1",
