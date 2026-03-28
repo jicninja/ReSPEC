@@ -48,3 +48,13 @@ export interface ResolvedAIConfig {
   engines: Record<string, EngineConfig>;
   phases: PhaseRouting;
 }
+
+export interface BatchAction {
+  action: 'continue' | 'abort';
+  extraPrompt?: string;
+  retryTasks?: { id: string; extraPrompt: string }[];
+}
+
+export interface OrchestratorHooks {
+  onBatchComplete?(results: SubagentResult[]): Promise<BatchAction>;
+}

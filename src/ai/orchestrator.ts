@@ -1,4 +1,4 @@
-import type { AIEngine, SubagentTask, SubagentResult, EngineConfig } from './types.js';
+import type { AIEngine, SubagentTask, SubagentResult, EngineConfig, OrchestratorHooks } from './types.js';
 
 export class Orchestrator {
   private readonly engines: AIEngine[];
@@ -7,6 +7,7 @@ export class Orchestrator {
     engines: AIEngine | AIEngine[],
     private readonly config: { max_parallel: number; timeout: number },
     private readonly engineConfigs?: Record<string, EngineConfig>,
+    private readonly hooks?: OrchestratorHooks,
   ) {
     this.engines = Array.isArray(engines) ? engines : [engines];
   }
@@ -14,12 +15,53 @@ export class Orchestrator {
   async runAll(tasks: SubagentTask[]): Promise<SubagentResult[]> {
     const results: SubagentResult[] = [];
     const chunks = this.chunk(tasks, this.config.max_parallel);
+    let extraPrompt: string | undefined;
 
     for (const batch of chunks) {
-      const batchResults = await Promise.allSettled(batch.map((t) => this.runOne(t)));
+      const injectedBatch = extraPrompt
+        ? batch.map((t) => ({
+            ...t,
+            prompt: `${t.prompt}\n\n## Additional Instructions (user-provided)\n\n${extraPrompt}`,
+          }))
+        : batch;
+
+      const batchResults = await Promise.allSettled(injectedBatch.map((t) => this.runOne(t)));
+      const batchResolved: SubagentResult[] = [];
       for (const result of batchResults) {
         if (result.status === 'fulfilled') {
-          results.push(result.value);
+          batchResolved.push(result.value);
+        }
+      }
+      results.push(...batchResolved);
+
+      if (this.hooks?.onBatchComplete) {
+        const action = await this.hooks.onBatchComplete(batchResolved);
+
+        if (action.action === 'abort') {
+          break;
+        }
+
+        if (action.retryTasks && action.retryTasks.length > 0) {
+          for (const retrySpec of action.retryTasks) {
+            const originalTask = tasks.find((t) => t.id === retrySpec.id);
+            if (!originalTask) continue;
+            const retryTask: SubagentTask = {
+              ...originalTask,
+              prompt: `${originalTask.prompt}\n\n## Additional Instructions (user-provided)\n\n${retrySpec.extraPrompt}`,
+            };
+            const retryResult = await this.runOne(retryTask);
+            // Replace the existing result for this id
+            const idx = results.findIndex((r) => r.id === retrySpec.id);
+            if (idx !== -1) {
+              results[idx] = retryResult;
+            } else {
+              results.push(retryResult);
+            }
+          }
+        }
+
+        if (action.extraPrompt) {
+          extraPrompt = action.extraPrompt;
         }
       }
     }
