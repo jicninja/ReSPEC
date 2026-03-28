@@ -47,6 +47,11 @@ async function executeCommand(command: string, dir: string): Promise<void> {
       await runValidate(dir, {});
       break;
     }
+    case 'review': {
+      const { runReview } = await import('../commands/review.js');
+      await runReview(dir, { ci: true });
+      break;
+    }
   }
 }
 
