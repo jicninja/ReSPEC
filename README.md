@@ -15,16 +15,19 @@ You have a working system but no spec. Rebuilding means either losing institutio
 ## How it works
 
 ```
-respec init       → creates respec.config.yaml
-respec ingest     → reads repo, Jira, docs → .respec/raw/
+respec              → interactive wizard (guides you through the pipeline)
+respec init         → creates respec.config.yaml
+respec ingest       → reads repo, Jira, docs → .respec/raw/
   ↓  (you review the raw data)
-respec analyze    → AI extracts domain model, rules, flows → .respec/analyzed/
+respec analyze      → AI extracts domain model, rules, flows → .respec/analyzed/
   ↓  (you validate the analysis)
-respec generate   → produces final specs → /specs/
-respec export     → repackages specs into a different format
+respec generate     → produces final specs → /specs/
+respec export       → repackages specs into a different format
 ```
 
 Each phase produces Markdown files. You review and edit between phases. Every command is idempotent.
+
+Run `respec` with no arguments for the **interactive wizard** — it detects your pipeline state and guides you step by step, with an **autopilot** mode that runs the full pipeline automatically.
 
 ## Quick start
 
@@ -32,22 +35,14 @@ Each phase produces Markdown files. You review and edit between phases. Every co
 # Install
 npm install -g respec-cli
 
-# Initialize in your project directory
-respec init
+# Interactive wizard — guides you through everything
+respec
 
-# Edit respec.config.yaml to point to your legacy repo
-# Then ingest
-respec ingest
-
-# Check what was captured
-respec status
-ls .respec/raw/
-
-# Run AI analysis (requires claude, codex, or gemini CLI)
-respec analyze
-
-# Generate specs
-respec generate
+# Or run commands individually:
+respec init           # create config
+respec ingest         # read sources
+respec analyze        # AI analysis
+respec generate       # produce specs
 ```
 
 ## Agent-agnostic
@@ -56,16 +51,58 @@ ReSpec works with any AI coding agent. Configure once in `respec.config.yaml`:
 
 ```yaml
 ai:
-  engine: claude    # "claude" | "codex" | "gemini" | "custom"
-  max_parallel: 4   # concurrent subagents
-  timeout: 600       # seconds per subagent
+  engine: claude    # simple single-engine (default)
+  max_parallel: 4
+  timeout: 600
 ```
 
-Analyzers and generators run as parallel subagents for speed. Tier 1 analyzers (domain, infra, API) run first, then Tier 2 (flows, rules, permissions) uses their output.
+Or use **multi-engine routing** with fallback chains:
 
-## Interactive TUI
+```yaml
+ai:
+  timeout: 600
+  engines:
+    claude:
+      model: opus
+      timeout: 900
+    gemini:
+      model: pro
+  phases:
+    analyze: [claude, gemini]   # fallback: if claude fails, try gemini
+    generate: gemini
+```
 
-ReSpec runs in interactive mode by default with real-time progress, styled output, and smart breakpoints that pause when something needs your attention.
+Both formats are supported. Analyzers and generators run as parallel subagents. Tier 1 analyzers (domain, infra, API) run first, then Tier 2 (flows, rules, permissions) uses their output.
+
+## Interactive Wizard
+
+Run `respec` with no arguments to launch the interactive wizard:
+
+```
+  ╦═╗╔═╗╔═╗╔═╗╔═╗╔═╗
+  ╠╦╝║╣ ╚═╗╠═╝║╣ ║
+  ╩╚═╚═╝╚═╝╩  ╚═╝╚═╝
+  reverse engineering → spec
+
+◇  Pipeline: empty. What's next?
+│  ● Ingest sources (recommended)
+│  ○ Autopilot — run full pipeline
+│  ○ View status
+│  ○ Exit
+└
+```
+
+- **Contextual menus** — shows only valid actions for your current pipeline state
+- **Autopilot** — runs the entire remaining pipeline automatically
+- **Pause (P)** — press during execution to pause after the current batch, then:
+  - View outputs so far
+  - Add instructions to refine remaining AI prompts
+  - Retry a task with different instructions
+  - Resume or abort
+
+## TUI Modes
+
+Individual commands support three modes:
 
 ```
 respec ingest              # interactive (default) — pauses on questions
@@ -73,7 +110,7 @@ respec ingest --auto       # auto-continue — runs through, logs decisions
 respec ingest --ci         # CI mode — plain text, no colors, no interaction
 ```
 
-**Runtime mode switching** — press `a` anytime to switch to auto-continue, or `p` to pause back to interactive. No need to restart.
+**Runtime mode switching** — press `a` anytime to switch to auto-continue, or `p` to pause back to interactive.
 
 When running in `--auto` mode, all decisions are logged to `.respec/_decisions.md` so you can review what was auto-decided after the run.
 
@@ -147,7 +184,7 @@ sources:
       - ./README.md
 
 ai:
-  engine: claude
+  engine: claude               # or use engines: { claude: {}, gemini: {} }
   max_parallel: 4
   timeout: 600
 
@@ -164,6 +201,7 @@ Credentials always use the `env:` prefix — never stored in the config file.
 
 | Command | What it does |
 |---------|-------------|
+| `respec` | Interactive wizard — guides you through the pipeline |
 | `respec init` | Creates `respec.config.yaml` with sensible defaults |
 | `respec ingest` | Reads repo, Jira, docs into `.respec/raw/` |
 | `respec analyze` | AI analysis of raw data into `.respec/analyzed/` |
@@ -245,7 +283,7 @@ git clone <repo-url>
 cd ReSpec
 npm install
 npm run build     # compile TypeScript
-npm test          # run 136 tests
+npm test          # run tests
 npm run dev       # watch mode
 ```
 

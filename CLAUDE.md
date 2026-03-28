@@ -7,7 +7,7 @@ ReSpec is a CLI tool that reads legacy codebases, Jira tickets, and documentatio
 ## Stack
 
 - **Runtime**: Node.js >= 20, TypeScript (ESM, `"type": "module"`)
-- **CLI framework**: commander
+- **CLI framework**: commander + @clack/prompts (wizard)
 - **AI engine**: Pluggable — Claude Code, Codex CLI, Gemini CLI, or custom
 - **Config**: YAML with Zod validation (`respec.config.yaml`)
 - **Jira client**: jira.js (Atlassian SDK)
@@ -32,6 +32,7 @@ respec export   → repackages into kiro|openspec|antigravity|superpowers
 
 | Command | Description | Key Flags |
 |---------|-------------|-----------|
+| `respec` | Interactive wizard — contextual menus, autopilot, pause/inject | |
 | `respec init` | Creates respec.config.yaml with defaults | |
 | `respec ingest` | Reads all sources to `/.respec/raw/` | `--source repo\|context\|jira\|docs` |
 | `respec analyze` | AI analysis to `/.respec/analyzed/` | `--only <analyzer>` `--force` |
@@ -206,9 +207,22 @@ Each self-reports confidence (HIGH/MEDIUM/LOW) in `_analysis-report.md`. Confide
 | `antigravity` | Google Antigravity | `GEMINI.md` + `.agent/rules/` |
 | `superpowers` | Claude Code | `CLAUDE.md` + `skills/` |
 
+## Interactive Wizard
+
+Running `respec` with no arguments launches the interactive wizard (`src/wizard/`). It detects the current pipeline state and shows contextual menus with only valid actions. Features:
+
+- **Autopilot**: runs remaining pipeline phases automatically
+- **Pause (P)**: pauses after current batch, then offers: view outputs, add instructions (prompt injection), retry a task with modifications, resume, or abort
+- **Prompt injection**: user-provided instructions appended to remaining AI prompts as `## Additional Instructions (user-provided)` section
+- **Orchestrator hooks**: `OrchestratorHooks` interface in `src/ai/types.ts` with `onBatchComplete` callback. Wizard registers hooks via `src/wizard/hooks.ts`. CI/auto mode has no hooks (zero overhead).
+
+Wizard code lives in `src/wizard/`: index.ts (main loop), splash.ts (ASCII art), menu.ts (contextual menus), runner.ts (spinner + autopilot), pause.ts (pause menu helpers), hooks.ts (orchestrator hook → clack UI).
+
+Uses `@clack/prompts` for all interactive UI (selects, spinners, text input).
+
 ## TUI (Terminal UI)
 
-All commands use an interactive TUI with 3 modes:
+Individual commands use an interactive TUI with 3 modes:
 
 | Mode | Flag | Behavior |
 |------|------|----------|
