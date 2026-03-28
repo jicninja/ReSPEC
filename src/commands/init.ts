@@ -12,6 +12,8 @@ import {
   RESPEC_DIR,
   CONFIG_FILENAME,
 } from '../constants.js';
+import { detectProject } from '../init/detect.js';
+import { detectSiblings } from '../init/siblings.js';
 
 export async function runInit(dir: string): Promise<void> {
   const configPath = path.join(dir, CONFIG_FILENAME);
@@ -21,25 +23,32 @@ export async function runInit(dir: string): Promise<void> {
     return;
   }
 
-  const defaultConfig = {
+  const project = detectProject(dir);
+  const siblings = detectSiblings(dir);
+
+  const config: Record<string, unknown> = {
     project: {
-      name: 'my-project',
-      version: '1.0',
-      description: 'Describe your project here',
+      name: project.name,
+      description: project.description,
+      ...(project.version ? { version: project.version } : {}),
     },
     sources: {
       repo: {
         path: './',
         branch: DEFAULT_REPO_BRANCH,
-        role: 'primary',
-        include: ['src/**'],
-        exclude: ['node_modules/**', 'dist/**', '.git/**'],
+        include: project.includes,
+        exclude: project.excludes,
       },
+      ...(siblings.length > 0 ? {
+        context: siblings.map(s => ({
+          name: s.name,
+          path: s.path,
+          role: s.role,
+        })),
+      } : {}),
     },
     ai: {
-      engines: {
-        [DEFAULT_AI_ENGINE]: {},
-      },
+      engines: { [DEFAULT_AI_ENGINE]: {} },
       max_parallel: DEFAULT_MAX_PARALLEL,
       timeout: DEFAULT_AI_TIMEOUT_SECONDS,
     },
@@ -51,21 +60,22 @@ export async function runInit(dir: string): Promise<void> {
     },
   };
 
-  let yamlContent = stringify(defaultConfig);
+  let yamlContent = stringify(config);
 
-  // Append multi-engine example as comments
+  // Append Jira/docs guide as comments
   yamlContent += `
-# Multi-engine alternative (use EITHER simple engines: {claude: {}} OR this advanced format):
-# ai:
-#   engines:
-#     claude:
-#       model: opus
-#       timeout: 900
-#     gemini:
-#       model: pro
-#   phases:
-#     analyze: [claude, gemini]
-#     generate: gemini
+# To add Jira and docs context, add to sources:
+#   jira:
+#     host: https://company.atlassian.net
+#     auth: env:JIRA_API_TOKEN
+#     filters:
+#       projects: [PROJ]
+#   docs:
+#     confluence:
+#       host: https://company.atlassian.net/wiki
+#       space: ENG
+#       auth: env:CONFLUENCE_TOKEN
+#     local: ["./docs", "./README.md"]
 `;
 
   fs.writeFileSync(configPath, yamlContent, 'utf-8');
@@ -83,8 +93,6 @@ export async function runInit(dir: string): Promise<void> {
         : content + '\n' + respecEntry + '\n';
       fs.writeFileSync(gitignorePath, updated, 'utf-8');
       console.log(`Added ${respecEntry} to .gitignore`);
-    } else {
-      console.log(`.gitignore already contains ${respecEntry}`);
     }
   } else {
     fs.writeFileSync(gitignorePath, respecEntry + '\n', 'utf-8');
