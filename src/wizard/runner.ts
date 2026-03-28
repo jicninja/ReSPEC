@@ -23,11 +23,22 @@ export async function runWithSpinner(
 ): Promise<{ ok: boolean; error?: string }> {
   const s = clack.spinner();
   s.start(label);
+
+  // Suppress stdout/stderr from underlying commands — wizard owns the UI
+  const origWrite = process.stdout.write.bind(process.stdout);
+  const origErr = process.stderr.write.bind(process.stderr);
+  process.stdout.write = () => true;
+  process.stderr.write = () => true;
+
   try {
     await fn();
+    process.stdout.write = origWrite;
+    process.stderr.write = origErr;
     s.stop(`${label} — done`);
     return { ok: true };
   } catch (err) {
+    process.stdout.write = origWrite;
+    process.stderr.write = origErr;
     const message = err instanceof Error ? err.message : String(err);
     s.stop(`${label} — failed: ${message}`);
     return { ok: false, error: message };
