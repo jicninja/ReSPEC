@@ -14,6 +14,7 @@ import {
   RESPEC_DIR,
   CONFIG_FILENAME,
   OUTPUT_FORMATS,
+  AI_ENGINES,
 } from '../constants.js';
 
 export async function runInteractiveInit(dir: string): Promise<void> {
@@ -144,6 +145,14 @@ export async function runInteractiveInit(dir: string): Promise<void> {
     };
   }
 
+  // AI Engine
+  const engine = await clack.select({
+    message: 'AI engine?',
+    options: AI_ENGINES.map(e => ({ value: e, label: e })),
+    initialValue: DEFAULT_AI_ENGINE,
+  });
+  if (clack.isCancel(engine)) return;
+
   // Output format
   const format = await clack.select({
     message: 'Output format?',
@@ -176,7 +185,7 @@ export async function runInteractiveInit(dir: string): Promise<void> {
       ...(docsConfig ? { docs: docsConfig } : {}),
     },
     ai: {
-      engines: { [DEFAULT_AI_ENGINE]: {} },
+      engines: { [engine as string]: {} },
       max_parallel: DEFAULT_MAX_PARALLEL,
       timeout: DEFAULT_AI_TIMEOUT_SECONDS,
     },
