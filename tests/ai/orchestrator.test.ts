@@ -150,6 +150,93 @@ describe('Orchestrator with fallback chain', () => {
   });
 });
 
+describe('Orchestrator hooks', () => {
+  it('calls onBatchComplete between batches', async () => {
+    const engine = makeMockEngine(async () => 'done');
+    const onBatchComplete = vi.fn(async () => ({ action: 'continue' as const }));
+    const orchestrator = new Orchestrator(
+      engine,
+      { max_parallel: 2, timeout: 30 },
+      undefined,
+      { onBatchComplete },
+    );
+
+    await orchestrator.runAll(tasks); // 3 tasks, max_parallel 2 = 2 batches
+    expect(onBatchComplete).toHaveBeenCalledTimes(2);
+  });
+
+  it('aborts remaining batches when hook returns abort', async () => {
+    const engine = makeMockEngine(async () => 'done');
+    let callCount = 0;
+    const onBatchComplete = vi.fn(async () => {
+      callCount++;
+      return { action: callCount === 1 ? 'abort' as const : 'continue' as const };
+    });
+    const orchestrator = new Orchestrator(
+      engine,
+      { max_parallel: 2, timeout: 30 },
+      undefined,
+      { onBatchComplete },
+    );
+
+    const results = await orchestrator.runAll(tasks);
+    expect(results).toHaveLength(2);
+    expect(onBatchComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it('injects extraPrompt into remaining tasks', async () => {
+    const engine = makeMockEngine(async (prompt) => `echo: ${prompt}`);
+    const onBatchComplete = vi.fn(async () => ({
+      action: 'continue' as const,
+      extraPrompt: 'INJECTED',
+    }));
+    const orchestrator = new Orchestrator(
+      engine,
+      { max_parallel: 2, timeout: 30 },
+      undefined,
+      { onBatchComplete },
+    );
+
+    const results = await orchestrator.runAll(tasks);
+    const task3 = results.find(r => r.id === 'task-3');
+    expect(task3?.output).toContain('INJECTED');
+  });
+
+  it('retries tasks when hook returns retryTasks', async () => {
+    let runCount = 0;
+    const engine = makeMockEngine(async (prompt) => {
+      runCount++;
+      return `run-${runCount}: ${prompt}`;
+    });
+    const onBatchComplete = vi.fn()
+      .mockResolvedValueOnce({
+        action: 'continue',
+        retryTasks: [{ id: 'task-1', extraPrompt: 'RETRY_CONTEXT' }],
+      })
+      .mockResolvedValue({ action: 'continue' });
+
+    const orchestrator = new Orchestrator(
+      engine,
+      { max_parallel: 2, timeout: 30 },
+      undefined,
+      { onBatchComplete },
+    );
+
+    const results = await orchestrator.runAll(tasks);
+    const task1Results = results.filter(r => r.id === 'task-1');
+    expect(task1Results).toHaveLength(1);
+    expect(task1Results[0].output).toContain('RETRY_CONTEXT');
+  });
+
+  it('works without hooks (backwards compat)', async () => {
+    const engine = makeMockEngine(async () => 'done');
+    const orchestrator = new Orchestrator(engine, { max_parallel: 4, timeout: 30 });
+
+    const results = await orchestrator.runAll(tasks);
+    expect(results).toHaveLength(3);
+  });
+});
+
 describe('Orchestrator per-engine config', () => {
   it('passes per-engine timeout and model to engine.run()', async () => {
     const engine = makeMockEngine(async () => 'result');
