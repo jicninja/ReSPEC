@@ -52,6 +52,11 @@ async function executeCommand(command: string, dir: string): Promise<void> {
       await runReview(dir, { ci: true });
       break;
     }
+    case 'diff': {
+      const { runDiff } = await import('../commands/diff.js');
+      await runDiff(dir, { ci: true });
+      break;
+    }
   }
 }
 
@@ -129,7 +134,7 @@ export async function runWizard(dir: string): Promise<void> {
       continue;
     }
 
-    if (action === 'status' || action === 'validate') {
+    if (action === 'status' || action === 'validate' || action === 'diff') {
       await executeCommand(action, dir);
       continue;
     }

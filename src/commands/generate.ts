@@ -7,7 +7,8 @@ import { Orchestrator } from '../ai/orchestrator.js';
 import { getGeneratorsByTier, getGeneratorRegistry } from '../generators/registry.js';
 import { createFormatAdapter } from '../formats/factory.js';
 import { analyzedDir, specsDir, writeMarkdown } from '../utils/fs.js';
-import { PHASE_ANALYZED, PHASE_GENERATE } from '../constants.js';
+import { PHASE_ANALYZED, PHASE_GENERATE, RESPEC_DIR } from '../constants.js';
+import { takeSnapshot } from '../diff/snapshot.js';
 import { createTUI } from '../tui/factory.js';
 import { loadPromptTemplate } from '../prompts/loader.js';
 import { buildERDPrompt } from '../generators/erd-gen.js';
@@ -79,6 +80,11 @@ export async function runGenerate(
   }
 
   const generatorsRun: string[] = [];
+
+  // Snapshot current specs state before running
+  const snapshotsDir = path.join(dir, RESPEC_DIR, 'snapshots');
+  takeSnapshot(outputDir, snapshotsDir, 'specs');
+
   const maxTier = Math.max(...allGenerators.map((g) => g.tier));
 
   for (let tier = 1; tier <= maxTier; tier++) {
