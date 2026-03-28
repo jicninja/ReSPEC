@@ -35,6 +35,11 @@ export const PHASE_ANALYZED = 'analyzed' as const;
 export const PHASE_GENERATED = 'generated' as const;
 export const PHASE_ORDER = [PHASE_EMPTY, PHASE_INGESTED, PHASE_ANALYZED, PHASE_GENERATED] as const;
 
+// ── AI Pipeline Phases (for multi-engine routing) ──────────────────
+export const PHASE_ANALYZE = 'analyze' as const;
+export const PHASE_GENERATE = 'generate' as const;
+export const AI_PIPELINE_PHASES = [PHASE_ANALYZE, PHASE_GENERATE] as const;
+
 // ── Context Source Roles ─────────────────────────────────────────────
 export const CONTEXT_ROLES = [
   'backend',
