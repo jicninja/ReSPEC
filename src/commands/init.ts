@@ -15,7 +15,11 @@ import {
 import { detectProject } from '../init/detect.js';
 import { detectSiblings } from '../init/siblings.js';
 
-export async function runInit(dir: string): Promise<void> {
+export interface InitOptions {
+  repo?: string;
+}
+
+export async function runInit(dir: string, options?: InitOptions): Promise<void> {
   const configPath = path.join(dir, CONFIG_FILENAME);
 
   if (fs.existsSync(configPath)) {
@@ -34,7 +38,7 @@ export async function runInit(dir: string): Promise<void> {
     },
     sources: {
       repo: {
-        path: './',
+        path: options?.repo ?? './',
         branch: DEFAULT_REPO_BRANCH,
         include: project.includes,
         exclude: project.excludes,

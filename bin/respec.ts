@@ -27,13 +27,16 @@ program
   .description('Reverse Engineering to Specification')
   .version('0.1.0')
   .option('--auto', 'Auto-continue mode (no interaction)')
-  .option('--ci', 'CI mode (no colors, no interaction)');
+  .option('--ci', 'CI mode (no colors, no interaction)')
+  .option('--autopilot', 'Run full remaining pipeline (non-interactive)')
+  .option('--reset', 'Wipe .respec/ and specs/ before running');
 
 program
   .command('init')
   .description('Create respec.config.yaml with sensible defaults')
-  .action(wrapAction(async () => {
-    await runInit(process.cwd());
+  .option('--repo <path>', 'Repository path or git URL (default: ./)')
+  .action(wrapAction(async (cmdOpts: { repo?: string }) => {
+    await runInit(process.cwd(), { repo: cmdOpts.repo });
   }));
 
 program
@@ -93,10 +96,43 @@ program
     await runValidate(process.cwd(), options);
   }));
 
-// Default action: no subcommand → wizard
+// Default action: no subcommand → wizard or autopilot
 program.action(wrapAction(async () => {
+  const opts = program.opts();
+  const dir = process.cwd();
+
+  // --reset: wipe pipeline data
+  if (opts.reset) {
+    const { existsSync, rmSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const { RESPEC_DIR } = await import('../src/constants.js');
+    const respecPath = join(dir, RESPEC_DIR);
+    const specsPath = join(dir, 'specs');
+    if (existsSync(respecPath)) rmSync(respecPath, { recursive: true });
+    if (existsSync(specsPath)) rmSync(specsPath, { recursive: true });
+    console.log('Wiped .respec/ and specs/');
+  }
+
+  // --autopilot: run full pipeline non-interactively
+  if (opts.autopilot) {
+    const { existsSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const { CONFIG_FILENAME } = await import('../src/constants.js');
+
+    if (!existsSync(join(dir, CONFIG_FILENAME))) {
+      await runInit(dir);
+    }
+    await runIngest(dir, { ci: true, force: true });
+    await runAnalyze(dir, { ci: true, force: true });
+    await runGenerate(dir, { ci: true, force: true });
+    await runExport(dir, {});
+    console.log('Autopilot complete.');
+    return;
+  }
+
+  // No flags → interactive wizard
   const { runWizard } = await import('../src/wizard/index.js');
-  await runWizard(process.cwd());
+  await runWizard(dir);
 }));
 
 program.parse();

@@ -28,6 +28,14 @@ export async function runInteractiveInit(dir: string): Promise<void> {
   const detected = detectProject(dir);
   const siblings = detectSiblings(dir);
 
+  // Repo path
+  const repoPath = await clack.text({
+    message: 'Repository path or git URL?',
+    initialValue: './',
+    placeholder: 'e.g., ./ or https://github.com/user/repo.git',
+  });
+  if (clack.isCancel(repoPath)) return;
+
   // Project name
   const name = await clack.text({
     message: 'Project name?',
@@ -170,7 +178,7 @@ export async function runInteractiveInit(dir: string): Promise<void> {
     },
     sources: {
       repo: {
-        path: './',
+        path: repoPath as string,
         include: includeList,
         exclude: detected.excludes,
       },
