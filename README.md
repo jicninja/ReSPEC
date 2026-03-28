@@ -99,6 +99,7 @@ Run `respec` with no arguments to launch the interactive wizard:
   - Add instructions to refine remaining AI prompts
   - Retry a task with different instructions
   - Resume or abort
+- **Start fresh** — wipes `.respec/` and `specs/`, then re-runs the full pipeline from scratch
 
 ## TUI Modes
 
