@@ -2,12 +2,12 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { loadConfig } from '../config/loader.js';
 import { StateManager } from '../state/manager.js';
-import { createAIEngine } from '../ai/factory.js';
+import { createEngineChain } from '../ai/factory.js';
 import { Orchestrator } from '../ai/orchestrator.js';
 import { getGeneratorsByTier, getGeneratorRegistry } from '../generators/registry.js';
 import { createFormatAdapter } from '../formats/factory.js';
 import { analyzedDir, specsDir, writeMarkdown } from '../utils/fs.js';
-import { PHASE_ANALYZED } from '../constants.js';
+import { PHASE_ANALYZED, PHASE_GENERATE } from '../constants.js';
 import { createTUI } from '../tui/factory.js';
 import { buildERDPrompt } from '../generators/erd-gen.js';
 import { buildFlowPrompt } from '../generators/flow-gen.js';
@@ -49,10 +49,11 @@ export async function runGenerate(
 
   const format = config.output.format;
 
-  tui.phaseHeader('GENERATE', `Format: ${format}`);
+  const engines = createEngineChain(PHASE_GENERATE, config.ai);
+  const engineNames = engines.map((e) => e.name).join(' → ');
+  tui.phaseHeader('GENERATE', `Format: ${format} | Engine: ${engineNames}`);
 
-  const engine = createAIEngine(config.ai);
-  const orchestrator = new Orchestrator(engine, {
+  const orchestrator = new Orchestrator(engines, {
     max_parallel: config.ai.max_parallel,
     timeout: config.ai.timeout,
   });
