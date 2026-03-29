@@ -418,11 +418,8 @@ export interface BoundedContext {
 }
 
 function readIfExists(filePath: string): string {
-  try {
-    return fs.readFileSync(filePath, 'utf-8');
-  } catch {
-    return '';
-  }
+  if (!fs.existsSync(filePath)) return '';
+  return fs.readFileSync(filePath, 'utf-8');
 }
 
 export function toKebabCase(name: string): string {
@@ -834,10 +831,11 @@ describe('SpecKitFormat', () => {
   describe('manual mapping mode', () => {
     it('uses config mapping to group contexts', async () => {
       writeAnalyzedFile('domain/bounded-contexts.md', '## Auth\nHandles auth.\n\n## Users\nUser management.\n\n## Payments\nPayment processing.\n');
-      const configWithMapping = {
-        ...minimalConfig,
+      const configWithMapping = configSchema.parse({
+        project: { name: 'TestProject', description: 'A test project' },
+        sources: { repo: { path: '.' } },
         output: {
-          ...minimalConfig.output,
+          format: 'speckit',
           speckit: {
             mapping: [
               { name: 'identity', contexts: ['Auth', 'Users'] },
@@ -845,8 +843,8 @@ describe('SpecKitFormat', () => {
             ],
           },
         },
-      };
-      await adapter.package('', outputDir, ctx({ analyzedDir, config: configWithMapping as any }));
+      });
+      await adapter.package('', outputDir, ctx({ analyzedDir, config: configWithMapping }));
 
       expect(fs.existsSync(join(outputDir, '.specify', 'specs', '001-identity', 'spec.md'))).toBe(true);
       expect(fs.existsSync(join(outputDir, '.specify', 'specs', '002-billing', 'spec.md'))).toBe(true);
