@@ -1,6 +1,6 @@
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { parse as parseYaml } from 'yaml';
+import { parse as parseYaml, parseDocument } from 'yaml';
 import { configSchema, ReSpecConfig } from './schema.js';
 import { CONFIG_FILENAME } from '../constants.js';
 
@@ -31,6 +31,24 @@ export async function loadConfig(dir: string): Promise<ReSpecConfig> {
   }
 
   return result.data;
+}
+
+export async function updateConfig(dir: string, updates: Record<string, string>): Promise<void> {
+  const configPath = join(dir, CONFIG_FILENAME);
+
+  if (!existsSync(configPath)) {
+    throw new Error(`${CONFIG_FILENAME} not found in ${dir}`);
+  }
+
+  const raw = readFileSync(configPath, 'utf-8');
+  const doc = parseDocument(raw);
+
+  for (const [dotPath, value] of Object.entries(updates)) {
+    const keys = dotPath.split('.');
+    doc.setIn(keys, value);
+  }
+
+  writeFileSync(configPath, doc.toString(), 'utf-8');
 }
 
 export function resolveEnvAuth(value: string): string {
