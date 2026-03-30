@@ -29,7 +29,3 @@ export function generatedDir(projectDir: string, outputDir?: string): string {
   }
   return path.join(projectDir, RESPEC_DIR, GENERATED_DIR_NAME);
 }
-
-export function specsDir(projectDir: string, outputDir: string): string {
-  return path.resolve(projectDir, outputDir);
-}
