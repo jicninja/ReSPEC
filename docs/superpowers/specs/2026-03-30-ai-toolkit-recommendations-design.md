@@ -59,7 +59,9 @@ Canonical agent identifiers: `claude`, `gemini`, `kiro`, `copilot`, `cursor`, `b
 }
 ```
 
-Note: `reads` lists analyzed-phase files (resolved against `analyzedDir`), consistent with all other generators. The prompt builder additionally reads `raw/repo/dependencies.md` by deriving `rawDir` from `ctx.analyzedDir` (same pattern as kiro format adapter). A `buildToolkitPrompt` function must be registered in the `PROMPT_BUILDERS` map in `src/commands/generate.ts`.
+**rawDir access**: toolkit-gen is the first generator that reads from the raw phase. To support this cleanly, add an optional `rawDir` field to `GeneratorContext`. The generate command populates it from the project's `.respec/raw/` path. This avoids the fragile `path.join(analyzedDir, '..', 'raw')` pattern. The `reads` array only declares analyzed-phase paths (per convention) — the raw dependency on `raw/repo/dependencies.md` is accessed via `ctx.rawDir` and documented here as a known deviation from the standard generator contract.
+
+A `buildToolkitPrompt` function must be registered in the `PROMPT_BUILDERS` map in `src/commands/generate.ts`.
 
 ### Generator Flow
 
@@ -67,8 +69,8 @@ Note: `reads` lists analyzed-phase files (resolved against `analyzedDir`), consi
 2. **Build prompt**: ask AI engine to recommend MCPs, skills, plugins, extensions as structured JSON given the detected stack and target agent ecosystem
 3. **AI engine returns** text response containing JSON (possibly wrapped in code fences)
 4. **Parse JSON**: extract JSON from AI response (strip markdown fences if present), validate against expected schema. If parsing fails, log warning and produce empty recommendations file.
-5. **Validate packages**: for each recommendation with a `package` field, run `npm view <package>` with 5s timeout per call, up to 10 concurrent. Mark `validated: true|false`. If npm is not available, skip validation and mark all as `validated: null` (unknown).
-6. **Write** `.respec/generated/toolkit/recommendations.json` — this is JSON, not Markdown. The generator runner needs a conditional path: if the output file extension is `.json`, write raw content instead of using `writeMarkdown()`. Alternatively, toolkit-gen handles its own file writing and the runner skips it.
+5. **Validate packages**: for each recommendation with a `package` field, run `npm view <package>` with `TOOLKIT_VALIDATE_TIMEOUT` (default 5s) per call, up to `TOOLKIT_VALIDATE_CONCURRENCY` (default 10) concurrent. Mark `validated: true|false`. If npm is not available, skip validation and mark all as `validated: null` (unknown). Constants defined in `src/toolkit/constants.ts`.
+6. **Write** `.respec/generated/toolkit/recommendations.json` — this is JSON, not Markdown. The generator runner gets a conditional path: if the output file extension is `.json`, write raw content via `fs.writeFileSync()` instead of `writeMarkdown()`. This is a general-purpose improvement that benefits any future generator producing non-Markdown output. If `recommendations.json` exists but contains invalid JSON when read later (e.g., truncated write), treat as missing and log a warning.
 
 ### Prompt Strategy
 
@@ -137,7 +139,7 @@ The `--only toolkit-gen` flag works as expected, allowing re-generation of just 
       "category": "database"
     }
   ],
-  "processRecommendation": {
+  "workflowGuidance": {
     "complexity": "medium",
     "suggestedWorkflow": "spec-driven with domain decomposition",
     "reason": "3 bounded contexts detected, mobile + web targets"
@@ -168,7 +170,7 @@ The `install` field varies by recommendation type:
 | `copy` | Skills | `source: string, target: string` — file copy instructions |
 | `manual` | Extensions, plugins | `instructions: string` — human-readable setup steps |
 
-### processRecommendation
+### workflowGuidance
 
 This top-level field surfaces in two places:
 1. **In the wizard**: shown as a summary before the tool recommendations ("Suggested workflow: spec-driven with domain decomposition")
@@ -184,7 +186,7 @@ interface ToolkitRecommendations {
     multiAgent: boolean;
   };
   recommendations: Recommendation[];
-  processRecommendation: {
+  workflowGuidance: {
     complexity: 'simple' | 'medium' | 'complex';
     suggestedWorkflow: string;
     reason: string;
