@@ -72,6 +72,8 @@ export async function runGenerate(
     projectName: config.project.name,
     format,
     rawDir: rawDir(dir),
+    intent: config.project.intent,
+    contextNotes: config.project.context_notes,
   };
 
   const allGenerators = getGeneratorRegistry();
