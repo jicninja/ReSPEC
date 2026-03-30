@@ -32,7 +32,7 @@ export async function runExport(
     projectDescription: config.project.description ?? '',
     sddContent,
     analyzedDir: analyzedPath,
-    specsDir: inputDir,
+    generatedDir: inputDir,
     config,
     ciMode: !!options.ci,
   };
