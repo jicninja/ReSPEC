@@ -85,8 +85,8 @@ Run `respec` with no arguments to launch the interactive wizard:
   reverse engineering → spec
 
 ◇  Pipeline: empty. What's next?
-│  ● Ingest sources (recommended)
-│  ○ Autopilot — run full pipeline
+│  ● Run full pipeline (recommended)
+│  ○ Ingest sources only
 │  ○ View status
 │  ○ Exit
 └
@@ -216,6 +216,8 @@ project:
   name: MyApp
   version: "1.0"
   description: Legacy app to reverse-engineer
+  # intent: port to Fastify              # optional — guides AI prioritization
+  # context_notes: ...                    # optional — extra context refined across pipeline
 
 sources:
   repo:
@@ -272,7 +274,7 @@ Credentials always use the `env:` prefix — never stored in the config file.
 | `respec` | Interactive wizard — guides you through the pipeline |
 | `respec --autopilot` | Run full pipeline non-interactively (for CI/cloud) |
 | `respec --reset --autopilot` | Wipe and re-run full pipeline |
-| `respec init` | Smart init — auto-detects project from manifests |
+| `respec init` | Smart init — auto-detects project from manifests (`--detailed` for Jira/Confluence) |
 | `respec ingest` | Reads repo, Jira, docs into `.respec/raw/` |
 | `respec analyze` | AI analysis of raw data into `.respec/analyzed/` |
 | `respec generate` | Produces specs to `.respec/generated/` |
@@ -285,12 +287,15 @@ Credentials always use the `env:` prefix — never stored in the config file.
 
 **Global flags:**
 - `--autopilot` — run full remaining pipeline without interaction
+- `--intent <text>` — set project intent for this run (guides AI prioritization)
+- `--all` — run all analyzers/generators regardless of intent priority
 - `--reset` — wipe `.respec/` before running
 - `--ci` — CI mode (no colors, no interaction)
 - `--auto` — auto-continue mode
 
 **Command flags:**
 - `--repo <path|url>` — repository path or git URL (init)
+- `--detailed` — detailed init with Jira, Confluence, and advanced options (init)
 - `--source repo|context|jira|docs` — run a single ingestor
 - `--only <analyzer|generator>` — run a single analyzer or generator
 - `--format kiro|openspec|antigravity|superpowers|speckit|bmad` — target format for export
