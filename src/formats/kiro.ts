@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { ensureDir, writeMarkdown } from '../utils/fs.js';
 import { parseSectionHeaders, toKebabCase } from './context-parser.js';
+import { offerFrameworkInstall } from './framework-installer.js';
 import type { FormatAdapter, FormatContext } from './types.js';
 
 function readIfExists(filePath: string): string {
@@ -16,7 +17,16 @@ export class KiroFormat implements FormatAdapter {
   name = 'kiro';
 
   async package(specsDir: string, outputDir: string, context: FormatContext): Promise<void> {
-    const { projectName, projectDescription, sddContent, analyzedDir } = context;
+    const { projectName, projectDescription, sddContent, analyzedDir, ciMode } = context;
+
+    // Offer cc-sdd install for multi-agent Kiro-style SDD workflow
+    await offerFrameworkInstall({
+      name: 'cc-sdd',
+      checkPath: path.join(outputDir, '.kiro', 'settings'),
+      installCommand: 'npx cc-sdd@latest --claude --lang en',
+      cwd: outputDir,
+      ciMode,
+    });
 
     // Derive the raw dir: analyzedDir is typically /.respec/analyzed, raw is /.respec/raw
     const rawDir = analyzedDir ? path.join(analyzedDir, '..', 'raw') : '';
