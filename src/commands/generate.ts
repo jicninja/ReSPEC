@@ -64,7 +64,7 @@ export async function runGenerate(
 
   const generatorCtx: GeneratorContext = {
     analyzedDir: analyzedPath,
-    specsDir: outputDir,
+    generatedDir: outputDir,
     projectName: config.project.name,
     format,
   };
