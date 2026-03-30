@@ -52,7 +52,6 @@ A small module `src/pipeline/intent.ts` marks analyzers/generators as low-priori
 
 | Intent contains | Low-priority analyzers | Low-priority generators |
 |----------------|----------------------|------------------------|
-| "sdd only" | (none) | task-gen, format-gen, toolkit-gen, adr-gen, flow-gen, erd-gen |
 | "upgrade", "update", "version" | flow-extractor, permission-scanner | flow-gen |
 | "refactor" | (none) | (none — refactors need full analysis) |
 | "port", "migrate" | (none — ports need full analysis) | (none) |
@@ -76,7 +75,6 @@ Before ingest runs, the wizard asks 1-2 high-level questions that don't require 
 ```
 ? What type of project is this?
   ❯ Full system specification (default)
-    SDD only (system design document, no tasks or extras)
     Port / Migration
     Refactor
     Version upgrade
