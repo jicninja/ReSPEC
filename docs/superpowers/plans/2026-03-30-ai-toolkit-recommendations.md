@@ -183,13 +183,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { validatePackages, isNpmAvailable } from '../../src/toolkit/validator.js';
 import type { Recommendation } from '../../src/toolkit/types.js';
 
-// Mock child_process
+// Mock child_process — execSync for isNpmAvailable, execFile for validatePackages
 vi.mock('node:child_process', () => ({
   execSync: vi.fn(),
+  execFile: vi.fn(),
 }));
 
-import { execSync } from 'node:child_process';
+import { execSync, execFile } from 'node:child_process';
 const mockExecSync = vi.mocked(execSync);
+const mockExecFile = vi.mocked(execFile);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -209,7 +211,11 @@ describe('isNpmAvailable', () => {
 
 describe('validatePackages', () => {
   it('marks packages as validated when npm view succeeds', async () => {
-    mockExecSync.mockReturnValue(Buffer.from('{}'));
+    mockExecFile.mockImplementation((_cmd: any, _args: any, _opts: any, cb: any) => {
+      if (typeof _opts === 'function') { cb = _opts; }
+      cb(null, { stdout: '{}', stderr: '' });
+      return {} as any;
+    });
     const recs: Recommendation[] = [
       {
         type: 'mcp', name: 'test', package: '@test/pkg',
@@ -223,7 +229,11 @@ describe('validatePackages', () => {
   });
 
   it('marks packages as false when npm view fails', async () => {
-    mockExecSync.mockImplementation(() => { throw new Error('404'); });
+    mockExecFile.mockImplementation((_cmd: any, _args: any, _opts: any, cb: any) => {
+      if (typeof _opts === 'function') { cb = _opts; }
+      cb(new Error('404'));
+      return {} as any;
+    });
     const recs: Recommendation[] = [
       {
         type: 'mcp', name: 'test', package: '@bad/pkg',
@@ -247,7 +257,7 @@ describe('validatePackages', () => {
     ];
     const result = await validatePackages(recs);
     expect(result[0].validated).toBeNull();
-    expect(mockExecSync).not.toHaveBeenCalledWith(expect.stringContaining('npm view'), expect.anything());
+    expect(mockExecFile).not.toHaveBeenCalled();
   });
 });
 ```
@@ -261,9 +271,12 @@ Expected: FAIL — cannot resolve `../../src/toolkit/validator.js`
 
 ```typescript
 // src/toolkit/validator.ts
-import { execSync } from 'node:child_process';
+import { execSync, execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import { TOOLKIT_VALIDATE_TIMEOUT, TOOLKIT_VALIDATE_CONCURRENCY } from '../constants.js';
 import type { Recommendation } from './types.js';
+
+const execFileAsync = promisify(execFile);
 
 export function isNpmAvailable(): boolean {
   try {
@@ -274,9 +287,9 @@ export function isNpmAvailable(): boolean {
   }
 }
 
-function validateSinglePackage(pkg: string): boolean {
+async function validateSinglePackage(pkg: string): Promise<boolean> {
   try {
-    execSync(`npm view ${pkg} name`, { timeout: TOOLKIT_VALIDATE_TIMEOUT, stdio: 'pipe' });
+    await execFileAsync('npm', ['view', pkg, 'name'], { timeout: TOOLKIT_VALIDATE_TIMEOUT });
     return true;
   } catch {
     return false;
@@ -287,7 +300,7 @@ export async function validatePackages(recommendations: Recommendation[]): Promi
   const toValidate = recommendations.filter((r) => r.package && r.package.length > 0);
   const skipValidation = recommendations.filter((r) => !r.package || r.package.length === 0);
 
-  // Process in batches of TOOLKIT_VALIDATE_CONCURRENCY
+  // Process in batches of TOOLKIT_VALIDATE_CONCURRENCY (truly concurrent via async execFile)
   const results: Recommendation[] = [...skipValidation];
 
   for (let i = 0; i < toValidate.length; i += TOOLKIT_VALIDATE_CONCURRENCY) {
@@ -295,7 +308,7 @@ export async function validatePackages(recommendations: Recommendation[]): Promi
     const validated = await Promise.all(
       batch.map(async (rec) => ({
         ...rec,
-        validated: validateSinglePackage(rec.package),
+        validated: await validateSinglePackage(rec.package),
       }))
     );
     results.push(...validated);
@@ -721,19 +734,22 @@ git commit -m "feat(toolkit): add toolkit-gen prompt builder"
 
 ### Task 6: Wire toolkit-gen into Generate Command
 
-Register the prompt builder and pass rawDir to the generator context.
+Register the prompt builder, pass rawDir to the generator context, and add post-processing for toolkit-gen output (JSON parsing + npm validation).
 
 **Files:**
 - Modify: `src/commands/generate.ts:1-20` (add imports)
 - Modify: `src/commands/generate.ts:30-37` (add to PROMPT_BUILDERS)
 - Modify: `src/commands/generate.ts:62-70` (add rawDir to ctx)
+- Modify: `src/commands/generate.ts:122-135` (add toolkit-gen post-processing in result loop)
 
-- [ ] **Step 1: Add import for buildToolkitPrompt and rawDir**
+- [ ] **Step 1: Add imports**
 
 In `src/commands/generate.ts`, add after line 18 (`import { buildFormatPrompt } from '../generators/format-gen.js';`):
 
 ```typescript
 import { buildToolkitPrompt } from '../generators/toolkit-gen.js';
+import { extractJSON } from '../toolkit/json-parser.js';
+import { validatePackages, isNpmAvailable } from '../toolkit/validator.js';
 ```
 
 Also update the import on line 8 to include `rawDir`:
@@ -763,16 +779,56 @@ In `src/commands/generate.ts`, modify the `generatorCtx` construction (lines 65-
   };
 ```
 
-- [ ] **Step 4: Run the full test suite**
+- [ ] **Step 4: Add toolkit-gen post-processing in the result loop**
+
+In `src/commands/generate.ts`, modify the result writing block (lines 128-134). Replace:
+
+```typescript
+      if (result.status === 'success' && result.output) {
+        const outputFile = path.join(outputDir, resolveProducePath(generator.produces[0], generator.id));
+        writeMarkdown(outputFile, result.output);
+        tui.success(`${result.id} — done (${result.durationMs}ms)`);
+      }
+```
+
+With:
+
+```typescript
+      if (result.status === 'success' && result.output) {
+        const outputFile = path.join(outputDir, resolveProducePath(generator.produces[0], generator.id));
+
+        // toolkit-gen needs JSON parsing and npm validation
+        if (result.id === 'toolkit-gen') {
+          const parsed = extractJSON(result.output);
+          if (parsed) {
+            if (isNpmAvailable()) {
+              parsed.recommendations = await validatePackages(parsed.recommendations);
+            } else {
+              for (const rec of parsed.recommendations) rec.validated = null;
+            }
+            writeMarkdown(outputFile, JSON.stringify(parsed, null, 2));
+            tui.success(`${result.id} — done (${result.durationMs}ms, ${parsed.recommendations.length} recommendations)`);
+          } else {
+            tui.warn(`${result.id}: failed to parse AI response as JSON`);
+            writeMarkdown(outputFile, JSON.stringify({ stack: { detected: [], format, multiAgent: false }, recommendations: [], workflowGuidance: { complexity: 'simple', suggestedWorkflow: 'unknown', reason: 'AI response could not be parsed' } }, null, 2));
+          }
+        } else {
+          writeMarkdown(outputFile, result.output);
+          tui.success(`${result.id} — done (${result.durationMs}ms)`);
+        }
+      }
+```
+
+- [ ] **Step 5: Run the full test suite**
 
 Run: `npx vitest run`
 Expected: All tests pass (including updated registry test from Task 4)
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add src/commands/generate.ts
-git commit -m "feat(toolkit): wire toolkit-gen into generate command"
+git commit -m "feat(toolkit): wire toolkit-gen into generate command with JSON parsing and validation"
 ```
 
 ---
@@ -923,7 +979,9 @@ export function readRecommendations(generatedDir: string): ToolkitRecommendation
   try {
     const content = fs.readFileSync(filePath, 'utf-8');
     return JSON.parse(content);
-  } catch {
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    clack.log.warn(`Failed to read toolkit recommendations: ${message}`);
     return null;
   }
 }
@@ -1292,7 +1350,29 @@ Expected: FAIL
 
 - [ ] **Step 3: Update OpenSpecFormat**
 
-In `src/formats/openspec.ts`, add a helper function and modify the AGENTS.md content to include recommendations when available. Similar approach to superpowers but the section goes inside the `<openspec-instructions>` block.
+In `src/formats/openspec.ts`, add a helper function before the class:
+
+```typescript
+function buildToolkitSection(recs: FormatContext['toolkitRecommendations']): string {
+  if (!recs || recs.recommendations.length === 0) return '';
+
+  const mcps = recs.recommendations.filter((r) => r.type === 'mcp');
+  const other = recs.recommendations.filter((r) => r.type !== 'mcp');
+
+  let section = '\n\n## Recommended MCP Servers\n\n';
+  if (mcps.length > 0) {
+    section += mcps.map((r) => `- **${r.package}** — ${r.description} (agents: ${r.agents.join(', ')})`).join('\n');
+  }
+  if (other.length > 0) {
+    section += '\n\n## Other Recommended Tools\n\n';
+    section += other.map((r) => `- **${r.name}** — ${r.description}`).join('\n');
+  }
+
+  return section;
+}
+```
+
+Then modify the AGENTS.md generation to append the toolkit section inside the `<openspec-instructions>` content string, before the closing tag. Find the `writeMarkdown` call for AGENTS.md and concatenate `buildToolkitSection(context.toolkitRecommendations)` into the content.
 
 - [ ] **Step 4: Run test to verify it passes**
 
