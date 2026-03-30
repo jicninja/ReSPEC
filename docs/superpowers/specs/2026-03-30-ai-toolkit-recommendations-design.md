@@ -59,7 +59,7 @@ Canonical agent identifiers: `claude`, `gemini`, `kiro`, `copilot`, `cursor`, `b
 }
 ```
 
-**rawDir access**: toolkit-gen is the first generator that reads from the raw phase. To support this cleanly, add an optional `rawDir` field to `GeneratorContext`. The generate command populates it from the project's `.respec/raw/` path. This avoids the fragile `path.join(analyzedDir, '..', 'raw')` pattern. The `reads` array only declares analyzed-phase paths (per convention) — the raw dependency on `raw/repo/dependencies.md` is accessed via `ctx.rawDir` and documented here as a known deviation from the standard generator contract.
+**rawDir access**: toolkit-gen is the first generator that reads from the raw phase. To support this cleanly, add an optional `rawDir?: string` field to `GeneratorContext` in `src/generators/types.ts`. In `src/commands/generate.ts`, add `rawDir: rawDir(dir)` (from `src/utils/fs.ts`) to the `generatorCtx` object where it is constructed. `buildToolkitPrompt` must guard against `ctx.rawDir` being `undefined` (graceful degradation: skip dependency data, produce recommendations based on analyzed files only). The `reads` array only declares analyzed-phase paths (per convention) — the raw dependency on `raw/repo/dependencies.md` is accessed via `ctx.rawDir` and documented here as a known deviation from the standard generator contract.
 
 A `buildToolkitPrompt` function must be registered in the `PROMPT_BUILDERS` map in `src/commands/generate.ts`.
 
@@ -69,8 +69,8 @@ A `buildToolkitPrompt` function must be registered in the `PROMPT_BUILDERS` map 
 2. **Build prompt**: ask AI engine to recommend MCPs, skills, plugins, extensions as structured JSON given the detected stack and target agent ecosystem
 3. **AI engine returns** text response containing JSON (possibly wrapped in code fences)
 4. **Parse JSON**: extract JSON from AI response (strip markdown fences if present), validate against expected schema. If parsing fails, log warning and produce empty recommendations file.
-5. **Validate packages**: for each recommendation with a `package` field, run `npm view <package>` with `TOOLKIT_VALIDATE_TIMEOUT` (default 5s) per call, up to `TOOLKIT_VALIDATE_CONCURRENCY` (default 10) concurrent. Mark `validated: true|false`. If npm is not available, skip validation and mark all as `validated: null` (unknown). Constants defined in `src/toolkit/constants.ts`.
-6. **Write** `.respec/generated/toolkit/recommendations.json` — this is JSON, not Markdown. The generator runner gets a conditional path: if the output file extension is `.json`, write raw content via `fs.writeFileSync()` instead of `writeMarkdown()`. This is a general-purpose improvement that benefits any future generator producing non-Markdown output. If `recommendations.json` exists but contains invalid JSON when read later (e.g., truncated write), treat as missing and log a warning.
+5. **Validate packages**: for each recommendation with a `package` field, run `npm view <package>` with `TOOLKIT_VALIDATE_TIMEOUT` (default 5s) per call, up to `TOOLKIT_VALIDATE_CONCURRENCY` (default 10) concurrent. Mark `validated: true|false`. If npm is not available, skip validation and mark all as `validated: null` (unknown). Constants defined in `src/constants.ts` under a `// ── Toolkit ──` section, per project convention.
+6. **Write** `.respec/generated/toolkit/recommendations.json` — note: `writeMarkdown()` in `src/utils/fs.ts` is just `ensureDir` + `writeFileSync` with no Markdown-specific transformation, so it works fine for JSON content. No conditional path needed. If `recommendations.json` exists but contains invalid JSON when read later (e.g., truncated write), treat as missing and log a warning.
 
 ### Prompt Strategy
 
@@ -237,9 +237,15 @@ Lives in `src/toolkit/wizard.ts` as a standalone module. Called from `src/comman
 
 ```typescript
 // In src/commands/export.ts, after adapter.package():
+// autoMode comes from options.auto (CLI flag), not from FormatContext
+// ciMode comes from options.ci (CLI flag)
 const recommendations = readRecommendations(generatedDir);
 if (recommendations) {
-  await runToolkitWizard(recommendations, { format, ciMode, autoMode });
+  await runToolkitWizard(recommendations, {
+    format,
+    ciMode: !!options.ci,
+    autoMode: !!options.auto,
+  });
 }
 ```
 
