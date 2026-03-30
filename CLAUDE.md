@@ -12,7 +12,7 @@ ReSpec is a CLI tool that reads legacy codebases, Jira tickets, and documentatio
 - **Config**: YAML with Zod validation (`respec.config.yaml`)
 - **Jira client**: jira.js (Atlassian SDK)
 - **Git operations**: simple-git
-- **Output format**: Markdown + Mermaid, packaged as Kiro / OpenSpec / Antigravity / Superpowers
+- **Output format**: Markdown + Mermaid, packaged as Kiro / OpenSpec / Antigravity / Superpowers / Spec Kit / BMAD
 
 ## Architecture
 
@@ -25,7 +25,7 @@ respec ingest   → reads sources → /.respec/raw/
 respec analyze  → AI subagents → /.respec/analyzed/
   ↓ (human validates domain, flows, rules)
 respec generate → produces specs → /specs/
-respec export   → repackages into kiro|openspec|antigravity|superpowers
+respec export   → repackages into kiro|openspec|antigravity|superpowers|speckit|bmad
 ```
 
 ## CLI Commands
@@ -38,7 +38,7 @@ respec export   → repackages into kiro|openspec|antigravity|superpowers
 | `respec ingest` | Reads all sources to `/.respec/raw/` | `--source repo\|context\|jira\|docs` |
 | `respec analyze` | AI analysis to `/.respec/analyzed/` | `--only <analyzer>` `--force` |
 | `respec generate` | Generates specs in configured format | `--only <generator>` `--force` |
-| `respec export` | Repackages specs into a different format | `--format kiro\|openspec\|antigravity\|superpowers` `--output <dir>` |
+| `respec export` | Repackages specs into a different format | `--format kiro\|openspec\|antigravity\|superpowers\|speckit\|bmad` `--output <dir>` |
 | `respec status` | Shows pipeline state | `--verbose` |
 | `respec validate` | Validates phase output integrity | `--phase raw\|analyzed\|specs` |
 
@@ -111,9 +111,13 @@ ai:
 
 output:
   dir: string                    # default: ./specs
-  format: kiro | openspec | antigravity | superpowers   # default: openspec
+  format: kiro | openspec | antigravity | superpowers | speckit | bmad   # default: openspec
   diagrams: mermaid | none
   tasks: boolean
+  speckit:                       # optional — only for speckit format
+    mapping:                     # manual feature grouping
+      - name: string
+        contexts: string[]
 ```
 
 ## Primary vs. Context Sources
@@ -207,6 +211,8 @@ Each self-reports confidence (HIGH/MEDIUM/LOW) in `_analysis-report.md`. Confide
 | `openspec` | Any agent | `openspec/specs/` + `openspec/changes/` |
 | `antigravity` | Google Antigravity | `GEMINI.md` + `.agent/rules/` |
 | `superpowers` | Claude Code | `CLAUDE.md` + `skills/` |
+| `speckit` | GitHub Spec Kit | `.specify/memory/` + `.specify/specs/` |
+| `bmad` | BMAD Method | `_bmad-output/planning-artifacts/` + `_bmad-output/project-context.md` |
 
 ## Interactive Wizard
 
