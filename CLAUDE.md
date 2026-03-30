@@ -39,6 +39,9 @@ respec export   → repackages into kiro|openspec|antigravity|superpowers
 | `respec analyze` | AI analysis to `/.respec/analyzed/` | `--only <analyzer>` `--force` |
 | `respec generate` | Generates specs in configured format | `--only <generator>` `--force` |
 | `respec export` | Repackages specs into a different format | `--format kiro\|openspec\|antigravity\|superpowers` `--output <dir>` |
+| `respec review` | AI review — detect hallucinations in specs | `--verbose` |
+| `respec diff` | Show changes since last analyze/generate run | `--phase analyzed\|specs` |
+| `respec push jira` | Push tasks to Jira as epics + stories | `--project` `--prefix` `--epics-only` `--dry-run` |
 | `respec status` | Shows pipeline state | `--verbose` |
 | `respec validate` | Validates phase output integrity | `--phase raw\|analyzed\|specs` |
 
@@ -231,6 +234,38 @@ Uses `@clack/prompts` for all interactive UI (selects, spinners, text input).
 **CLI mode** (`respec init`): generates YAML with detected values, siblings as context sources, and a Jira/docs guide as comments.
 
 **Wizard mode** (`respec` → Init): interactive step-by-step via `src/wizard/init-flow.ts`. Each field pre-filled with detected values, editable. Prompts for AI engine, Jira host/auth/filters, Confluence host/space/auth, local docs paths, and output format.
+
+## Prompt Overrides
+
+Users can override any analyzer/generator/reviewer prompt by placing a file in `{projectDir}/prompts/{id}.md`. Loading is handled by `src/prompts/loader.ts`:
+
+1. Check `{projectDir}/prompts/{id}.md` (user override)
+2. Fall back to `prompts/{id}.md` (built-in)
+3. Fall back to generic template
+
+A subprocess safety directive is always prepended to prevent the AI from attempting file operations. Analyzers load via `loadPromptTemplate(analyzer.id, dir)`. Generators check for override before using inline prompt builders.
+
+## Spec Diff
+
+`respec diff` compares the current state against snapshots taken before each run. Code lives in `src/diff/`:
+
+- `snapshot.ts` — `takeSnapshot(sourceDir, snapshotsDir, phase)` copies directory before analyze/generate. Only keeps last snapshot per phase.
+- `compare.ts` — `compareDirectories(oldDir, newDir)` returns `DiffResult` with added/removed/modified/unchanged files.
+- Snapshots stored in `.respec/snapshots/{phase}/`.
+
+## AI Reviewer
+
+`respec review` validates generated specs against raw data. Uses the `spec-reviewer` prompt template (`prompts/spec-reviewer.md`). Reads SDD + raw + analyzed, sends to AI, produces `.respec/review-report.md` with findings: claims without evidence, raw data not covered, inconsistencies, and verified items. Command at `src/commands/review.ts`.
+
+## Push to External Services
+
+`respec push jira` creates Jira issues from `specs/tasks/epics.md`. Code lives in `src/push/`:
+
+- `epic-parser.ts` — `parseEpics(markdown)` extracts typed `Epic[]` with `Story[]` children from the task-gen markdown output. Tolerant parser handles format variations.
+- `jira-pusher.ts` — `createJiraIssues(client, epics, options)` creates Epic and Story issues in Jira with configurable prefix (default `[ReSpec]`) and `respec` label on all issues.
+- `src/commands/push.ts` — command handler with `--dry-run`, `--project`, `--prefix`, `--epics-only` flags.
+
+Uses Jira credentials from `sources.jira` in config. Wizard mode prompts interactively for project key, prefix, and creation mode.
 
 ## TUI (Terminal UI)
 
