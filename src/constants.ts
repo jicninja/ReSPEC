@@ -11,6 +11,7 @@ export const DEFAULT_REPO_BRANCH = 'main';
 export const RESPEC_DIR = '.respec';
 export const RAW_DIR_NAME = 'raw';
 export const ANALYZED_DIR_NAME = 'analyzed';
+export const GENERATED_DIR_NAME = 'generated';
 export const STATE_FILENAME = 'state.json';
 export const CONFIG_FILENAME = 'respec.config.yaml';
 
