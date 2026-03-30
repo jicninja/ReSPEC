@@ -1,7 +1,12 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+
+vi.mock('../../src/formats/framework-installer.js', () => ({
+  offerFrameworkInstall: vi.fn().mockResolvedValue(false),
+}));
+
 import { KiroFormat } from '../../src/formats/kiro.js';
 import type { FormatContext } from '../../src/formats/types.js';
 import { configSchema } from '../../src/config/schema.js';
