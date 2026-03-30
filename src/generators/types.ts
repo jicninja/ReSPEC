@@ -11,4 +11,6 @@ export interface GeneratorContext {
   projectName: string;
   format: string;
   rawDir?: string;
+  intent?: string;
+  contextNotes?: string;
 }

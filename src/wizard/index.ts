@@ -17,6 +17,11 @@ async function executeCommand(command: string, dir: string): Promise<void> {
       await runInteractiveInit(dir);
       break;
     }
+    case 'init-detailed': {
+      const { runInteractiveInit } = await import('./init-flow.js');
+      await runInteractiveInit(dir);
+      break;
+    }
     case 'ingest': {
       const { runIngest } = await import('../commands/ingest.js');
       await runIngest(dir, { ci: true, force: true });
@@ -165,6 +170,24 @@ export async function runWizard(dir: string): Promise<void> {
       clack.log.success('Wiped .respec/ and specs/');
 
       await runAutopilot(dir, 'empty', executeCommand);
+      continue;
+    }
+
+    if (action === 'quick-setup') {
+      const { runQuickSetup } = await import('./quick-setup.js');
+      await runQuickSetup(dir);
+      const { runPipeline } = await import('./run-flow.js');
+      const { loadConfig } = await import('../config/loader.js');
+      const config = await loadConfig(dir);
+      await runPipeline(dir, detectState(dir), config, executeCommand);
+      continue;
+    }
+
+    if (action === 'run' || action === 'continue') {
+      const { runPipeline } = await import('./run-flow.js');
+      const { loadConfig } = await import('../config/loader.js');
+      const config = await loadConfig(dir);
+      await runPipeline(dir, detectState(dir), config, executeCommand);
       continue;
     }
 

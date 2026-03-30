@@ -32,9 +32,9 @@
 
   | Command | Description | Key Flags |
   |---------|-------------|-----------|
-  | `respec` | Interactive wizard — contextual menus, autopilot, pause/inject | |
+  | `respec` | Interactive wizard — contextual menus, run/continue, pause/inject | `--intent <text>` `--all` |
   | `respec --autopilot` | Run full remaining pipeline non-interactively | `--reset` `--ci` |
-  | `respec init` | Smart init — auto-detects project from manifests | `--repo <path\|url>` |
+  | `respec init` | Smart init — auto-detects project from manifests | `--repo <path\|url>` `--detailed` |
   | `respec ingest` | Reads all sources to `/.respec/raw/` | `--source repo\|context\|jira\|docs` |
   | `respec analyze` | AI analysis to `/.respec/analyzed/` | `--only <analyzer>` `--force` |
   | `respec generate` | Generates specs to `/.respec/generated/` | `--only <generator>` `--force` |
@@ -52,6 +52,8 @@
     name: string
     version: string
     description: string
+    intent: string                   # optional — what you want to achieve (e.g. "port to Fastify")
+    context_notes: string            # optional — extra context for AI (refined across pipeline)
 
   sources:
     repo:                          # primary — what gets the SDD
@@ -221,14 +223,29 @@
 
   Running `respec` with no arguments launches the interactive wizard (`src/wizard/`). It detects the current pipeline state and shows contextual menus with only valid actions. Features:
 
-  - **Autopilot**: runs remaining pipeline phases automatically
+  - **Quick setup**: `no-config` state offers a quick-setup flow that creates config and runs the full pipeline in one step
+  - **Run / Continue**: `empty` state shows "Run full pipeline"; `ingested`/`analyzed` states show "Continue pipeline" — replaces the old autopilot menu item
+  - **Autopilot**: runs remaining pipeline phases automatically (still available via `--autopilot` flag)
   - **Pause (P)**: pauses after current batch, then offers: view outputs, add instructions (prompt injection), retry a task with modifications, resume, or abort
   - **Prompt injection**: user-provided instructions appended to remaining AI prompts as `## Additional Instructions (user-provided)` section
   - **Orchestrator hooks**: `OrchestratorHooks` interface in `src/ai/types.ts` with `onBatchComplete` callback. Wizard registers hooks via `src/wizard/hooks.ts`. CI/auto mode has no hooks (zero overhead).
 
-  Wizard code lives in `src/wizard/`: index.ts (main loop), splash.ts (ASCII art), menu.ts (contextual menus), runner.ts (spinner + autopilot), pause.ts (pause menu helpers), hooks.ts (orchestrator hook → clack UI), init-flow.ts (interactive init).
+  Wizard code lives in `src/wizard/`: index.ts (main loop), splash.ts (ASCII art), menu.ts (contextual menus), runner.ts (spinner + autopilot), pause.ts (pause menu helpers), hooks.ts (orchestrator hook → clack UI), init-flow.ts (interactive init), quick-setup.ts (quick-setup flow), run-flow.ts (run/continue flow).
 
   Uses `@clack/prompts` for all interactive UI (selects, spinners, text input).
+
+  ## Intent System
+
+  The intent system guides pipeline prioritization across three passes. Code lives in `src/pipeline/`:
+
+  - `intent.ts` — `appendIntentToPrompt(prompt, intent, contextNotes)` injects intent into AI prompts; `getLowPriorityIds(intent)` maps intent keywords to low-priority analyzer/generator IDs
+  - `intent-suggest.ts` — post-ingest AI suggestions based on raw data, generates dynamic follow-up questions
+  - `intent-refine.ts` — post-analyze refinement based on analysis output
+  - `utils.ts` — shared pipeline utilities (`readFileOrEmpty`)
+
+  Config fields `project.intent` and `project.context_notes` store the intent and are updated across pipeline phases via `updateConfig()` in `src/config/loader.ts`. The `--intent` flag sets the intent for a CLI run. The `--all` flag disables intent-based prioritization.
+
+  `GeneratorContext` carries `intent?` and `contextNotes?` fields so generators can tailor output to the project's stated goal.
 
   ## Smart Init
 

@@ -1,7 +1,9 @@
 export type WizardState = 'no-config' | 'empty' | 'ingested' | 'analyzed' | 'generated';
 
 export type WizardAction =
-  | 'init' | 'ingest' | 'analyze' | 'generate' | 'export'
+  | 'init' | 'init-detailed' | 'quick-setup'
+  | 'run' | 'continue'
+  | 'ingest' | 'analyze' | 'generate' | 'export'
   | 'autopilot' | 'reset' | 'status' | 'validate' | 'review' | 'diff' | 'push-jira' | 'exit';
 
 export interface MenuOption {
@@ -12,40 +14,38 @@ export interface MenuOption {
 
 const MENUS: Record<WizardState, { options: Omit<MenuOption, 'hint'>[]; recommended: WizardAction }> = {
   'no-config': {
-    recommended: 'init',
+    recommended: 'quick-setup',
     options: [
-      { value: 'init', label: 'Initialize project (create config)' },
+      { value: 'quick-setup', label: 'Quick setup & run pipeline' },
+      { value: 'init', label: 'Initialize project (quick)' },
+      { value: 'init-detailed', label: 'Initialize project (detailed — Jira, Confluence, etc.)' },
       { value: 'exit', label: 'Exit' },
     ],
   },
   'empty': {
-    recommended: 'ingest',
+    recommended: 'run',
     options: [
-      { value: 'ingest', label: 'Ingest sources' },
-      { value: 'autopilot', label: 'Autopilot — run full pipeline' },
+      { value: 'run', label: 'Run full pipeline' },
+      { value: 'ingest', label: 'Ingest sources only' },
       { value: 'status', label: 'View status' },
       { value: 'exit', label: 'Exit' },
     ],
   },
   'ingested': {
-    recommended: 'analyze',
+    recommended: 'continue',
     options: [
-      { value: 'analyze', label: 'Analyze with AI' },
-      { value: 'autopilot', label: 'Autopilot — run remaining pipeline' },
-      { value: 'ingest', label: 'Re-ingest sources' },
-      { value: 'reset', label: 'Start fresh — wipe all and re-run' },
+      { value: 'continue', label: 'Continue pipeline (analyze → generate → export)' },
+      { value: 'analyze', label: 'Analyze only' },
       { value: 'status', label: 'View status' },
       { value: 'exit', label: 'Exit' },
     ],
   },
   'analyzed': {
-    recommended: 'generate',
+    recommended: 'continue',
     options: [
-      { value: 'generate', label: 'Generate specs' },
-      { value: 'autopilot', label: 'Autopilot — run remaining pipeline' },
-      { value: 'analyze', label: 'Re-analyze' },
+      { value: 'continue', label: 'Continue pipeline (generate → export)' },
+      { value: 'generate', label: 'Generate only' },
       { value: 'diff', label: 'View diff from last run' },
-      { value: 'reset', label: 'Start fresh — wipe all and re-run' },
       { value: 'status', label: 'View status' },
       { value: 'exit', label: 'Exit' },
     ],
