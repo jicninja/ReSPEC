@@ -32,13 +32,16 @@ program
   .option('--auto', 'Auto-continue mode (no interaction)')
   .option('--ci', 'CI mode (no colors, no interaction)')
   .option('--autopilot', 'Run full remaining pipeline (non-interactive)')
-  .option('--reset', 'Wipe .respec/ and specs/ before running');
+  .option('--reset', 'Wipe .respec/ and specs/ before running')
+  .option('--intent <text>', 'set project intent for this run')
+  .option('--all', 'run all analyzers/generators regardless of intent priority');
 
 program
   .command('init')
   .description('Create respec.config.yaml with sensible defaults')
   .option('--repo <path>', 'Repository path or git URL (default: ./)')
-  .action(wrapAction(async (cmdOpts: { repo?: string }) => {
+  .option('--detailed', 'detailed init with Jira, Confluence, and advanced options')
+  .action(wrapAction(async (cmdOpts: { repo?: string; detailed?: boolean }) => {
     await runInit(process.cwd(), { repo: cmdOpts.repo });
   }));
 
@@ -150,6 +153,44 @@ program.action(wrapAction(async () => {
     if (existsSync(respecPath)) rmSync(respecPath, { recursive: true });
     if (existsSync(specsPath)) rmSync(specsPath, { recursive: true });
     console.log('Wiped .respec/ and specs/');
+  }
+
+  // --intent: set project intent and run pipeline
+  if (opts.intent) {
+    const { existsSync } = await import('node:fs');
+    const { join } = await import('node:path');
+    const { CONFIG_FILENAME } = await import('../src/constants.js');
+
+    if (!existsSync(join(dir, CONFIG_FILENAME))) {
+      await runInit(dir);
+    }
+
+    const { updateConfig } = await import('../src/config/loader.js');
+    await updateConfig(dir, { 'project.intent': opts.intent });
+
+    const { loadConfig } = await import('../src/config/loader.js');
+    const config = await loadConfig(dir);
+    const { runPipeline } = await import('../src/wizard/run-flow.js');
+    const { StateManager } = await import('../src/state/manager.js');
+    const sm = new StateManager(dir);
+    const pipeline = sm.load();
+
+    const phaseToState: Record<string, string> = {
+      empty: 'empty', ingested: 'ingested', analyzed: 'analyzed', generated: 'generated',
+    };
+    const state = (phaseToState[pipeline.phase] ?? 'empty') as any;
+
+    const executeCmd = async (cmd: string, d: string) => {
+      switch (cmd) {
+        case 'ingest': return runIngest(d, { ci: true, force: true });
+        case 'analyze': return runAnalyze(d, { ci: true, force: true });
+        case 'generate': return runGenerate(d, { ci: true, force: true });
+        case 'export': return runExport(d, {});
+      }
+    };
+
+    await runPipeline(dir, state, config, executeCmd);
+    return;
   }
 
   // --autopilot: run full pipeline non-interactively
