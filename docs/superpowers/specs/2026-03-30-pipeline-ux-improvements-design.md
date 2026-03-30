@@ -201,9 +201,11 @@ export type WizardAction =
   | 'autopilot' | 'reset' | 'status' | 'validate' | 'review' | 'diff' | 'push-jira' | 'exit';
 ```
 
+Note: `'autopilot'` stays in the type because the CLI `--autopilot` flag triggers `runAutopilot()` in `src/wizard/runner.ts` which uses `executeCommand('autopilot')`. It is removed from wizard menus (replaced by `run`) but the action handler must still exist.
+
 Add corresponding cases in `executeCommand` switch in `src/wizard/index.ts`:
 - `'quick-setup'`: runs auto-detect → format prompt → persist config → falls through to `'run'`
-- `'run'`: runs `ingest → [Pass 1] → analyze → [Pass 2] → generate → export → [toolkit wizard]`
+- `'run'`: runs the full `RUN_STEPS` pipeline from current state
 - `'continue'`: same as `run` but starts from current pipeline state
 - `'init-detailed'`: runs `respec init` with `--detailed` flag
 
@@ -239,7 +241,7 @@ The Run/Continue flow has its own step-resolution logic (not reusing `getAutopil
 
 ```typescript
 const RUN_STEPS = [
-  { id: 'intent-type', phase: 'empty', interactive: true, skipIf: 'hasIntent' }, // skip if intent already in config
+  { id: 'intent-type', phase: 'empty', interactive: true, skipIf: () => !!config.project.intent }, // skip if intent already in config
   { id: 'ingest', phase: 'empty' },
   { id: 'intent-suggest', phase: 'ingested', interactive: true }, // dynamic detail questions
   { id: 'analyze', phase: 'ingested' },
@@ -262,12 +264,14 @@ Both support:
 respec                    # wizard → quick-setup if needed → Run
 respec --autopilot        # zero questions, zero pauses, defaults for everything
 respec --format kiro      # auto-init with format → Run
-respec --intent "..."     # auto-init with intent (skip Pass 1) → Run
+respec --intent "..."     # auto-init with intent (skip pre-ingest questions) → Run
 respec --all              # force all analyzers/generators (ignore low-priority)
 respec init               # interactive quick init
 respec init --detailed    # brainstorming-style init
 respec ingest/analyze/... # individual steps (power user, unchanged)
 ```
+
+**Auto-init** (triggered by `--format` or `--intent` when no config exists): runs the same auto-detect as quick-setup (project name, description, stack from manifests) but skips all interactive prompts. Uses the flag value for the specified field and defaults for everything else. Persists `respec.config.yaml` and immediately starts Run. If config already exists, the flag value overrides the config for that run only (does not persist).
 
 ## Detailed Init
 
